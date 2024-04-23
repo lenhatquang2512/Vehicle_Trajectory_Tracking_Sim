@@ -86,7 +86,7 @@ struct STATE{
     float y;
     float yaw;
 
-    STATE(void){}
+    STATE(void) = default;
 
     STATE(float x0, float y0, float yaw0):
         x(x0), y(y0), yaw(yaw0){}
@@ -113,6 +113,7 @@ struct STATE{
 struct CONTROL{
     float v;
     float w;
+    CONTROL(void) = default;
 };
 
 //Function Pointer Prototypes
