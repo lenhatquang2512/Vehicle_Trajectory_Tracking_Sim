@@ -5,6 +5,8 @@
 * Create a path following simulation for vehicle using RK4, PID and Bicycle Model in C++
   * Minimalism code style, no 3rd parties libraries (except Eigen)
 
+![](https://github.com/lenhatquang2512/Vehicle_Trajectory_Tracking_Sim/blob/main/gif/vehsim.gif)
+
 ## Requirement packages
 
 * g++ in Linux **Ubuntu**

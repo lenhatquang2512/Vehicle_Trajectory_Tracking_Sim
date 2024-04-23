@@ -382,8 +382,8 @@ int main(int argc, char const *argv[])
     std::remove(config.fbody.c_str()); // Deletes vehicle_body.txt
     std::remove(config.fwaypoint.c_str()); 
     
-    gp = popen("gnuplot","w");
-    // gp = popen("gnuplot -persist","w");
+    // gp = popen("gnuplot","w");
+    gp = popen("gnuplot -persist","w");
 
     if (gp == nullptr) {
         std::cerr << "Failed to open gnuplot." << std::endl;
