@@ -118,22 +118,23 @@ struct CONTROL{
 //Function Pointer Prototypes
 typedef STATE (*DynamicsFunc)(const STATE, const CONTROL);
 
-float deg2rad(const float deg) {
+constexpr float deg2rad(const float deg) {
     return static_cast<float>(deg * M_PI / 180.0);
 }
 
-float rad2deg(const float rad) {
+constexpr float rad2deg(const float rad) {
     return static_cast<float>(rad * 180.0/ M_PI);
 }
 
-void nominalAngle(float &angle){ //between -pi and pi
+constexpr void nominalAngle(float &angle){ //between -pi and pi
+    // angle = std::fmod(angle, 2.0f * M_PI);
     while (angle < -M_PI)
         angle += 2.0f * M_PI;
     while (angle > M_PI)
         angle -= 2.0f * M_PI;
 }
 
-void clamp(float &u, const float umin, const float umax){
+constexpr void clamp(float &u, const float umin, const float umax){
     if (u < umin) {
         u = umin;
     } else if (u > umax) {
@@ -141,16 +142,16 @@ void clamp(float &u, const float umin, const float umax){
     }
 }
 
-void rotate2D(float &xrot, float &yrot, const float x, const float y, const float angle){
+constexpr void rotate2D(float &xrot, float &yrot, const float x, const float y, const float angle){
 	xrot = x * std::cos(angle) - y * std::sin(angle);
 	yrot = x * std::sin(angle) + y * std::cos(angle);
 }
 
-void HAL_Delay(const float sec){
+inline void HAL_Delay(const float sec){ //can not be constexpr
     usleep(sec * 1000000);
 }
 
-float magicPacejkaFormula(const float alpha, const float Fz, const float mu){
+constexpr float magicPacejkaFormula(const float alpha, const float Fz, const float mu){
     const float B =  5.68;
     const float C =  1.817;
     float Fy =  mu * Fz * std::sin(C * std::atan((B/mu) * alpha));
@@ -297,11 +298,11 @@ void animationPlot(FILE *gp, const Config config, const STATE X){
     fflush(gp);
 }
 
-void PControl(float &U, const float error, const float Kp ){
+inline void PControl(float &U, const float error, const float Kp ){
     U = Kp * error;
 }
 
-void PIDControl(float &U, const float error, const float prev_error,
+inline void PIDControl(float &U, const float error, const float prev_error,
        float &integral_error,const float Kp, const float Ki, const float Kd,
        const float dt,const float outMin, const float outMax){
     //Init integral error or any kind of error outside globally
