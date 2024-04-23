@@ -2,7 +2,7 @@
 
 ## General description
 
-* Create a path following simulation for vehicle using RK4, PID and Bicycle Model
+* Create a path following simulation for vehicle using RK4, PID and Bicycle Model in C++
   * Minimalism code style, no 3rd parties libraries (except Eigen)
 
 ## Requirement packages
@@ -31,3 +31,11 @@
 ## Notes
 
 This is still under developing progress.
+
+User can choose any modes : Controller (P/PID)
+
+* Discrete Propagation(Euler/RK4)
+* Vehicle Dynamics (Naive/Advanced Bicycle model)
+* Waypoint Generator (P2P/Sinusoidal/Cubic/Zigzag)
+* Please modify which modes you want in the "config" Object
+* Of course, for different scenario all gains need to be tuned again
