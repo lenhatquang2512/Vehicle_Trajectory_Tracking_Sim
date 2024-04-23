@@ -26,7 +26,6 @@
 #include <cstdio> // For the std::remove function
 #include <memory>
 #include <limits>
-#include <Eigen/Dense>
 
 using Waypoint = std::vector<std::array<float, 2>>;
 using Gain = std::array<float,2>;
@@ -35,7 +34,11 @@ using Vsat = std::array<float,2>;
 #define CLAMP(x, lower, upper) ((x) < (lower) ? (lower) : ((x) > (upper) ? (upper) : (x)))
 #define PRINT_CMD(x) (std::cout << x << std::endl)
 #define INF (std::numeric_limits<float>::infinity())
+// #define EIGEN_LIB 1
 
+#ifdef EIGEN_LIB
+    #include <Eigen/Dense>
+#endif
 typedef enum 
 {
 	RK4_NAIVE_DYNAMICS = 0,
@@ -68,12 +71,14 @@ public:
     const PROPAGATOR_MODE propagator = RK4_NAIVE_DYNAMICS;
 };
 
+#ifdef EIGEN_LIB
 /* Itereation method for discrete model */
 bool solveRiccatiIterationD(const Eigen::MatrixXd &Ad,
                             const Eigen::MatrixXd &Bd, const Eigen::MatrixXd &Q,
                             const Eigen::MatrixXd &R, Eigen::MatrixXd &P,
                             const double &tolerance = 1.E-5,
                             const uint iter_max = 100000);
+#endif
 
 //from c++11 no need typedef,just warning
 struct STATE{ 
@@ -315,6 +320,7 @@ void computeError(const STATE X, const STATE goal, float &errV, float &errW){
     nominalAngle(errW);
 }
 
+#ifdef EIGEN_LIB
 bool solveRiccatiIterationD(const Eigen::MatrixXd &Ad,
                             const Eigen::MatrixXd &Bd, const Eigen::MatrixXd &Q,
                             const Eigen::MatrixXd &R, Eigen::MatrixXd &P,
@@ -343,6 +349,7 @@ bool solveRiccatiIterationD(const Eigen::MatrixXd &Ad,
   }
   return false; // over iteration limit
 }
+#endif
 
 int main(int argc, char const *argv[])
 {

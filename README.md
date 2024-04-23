@@ -42,3 +42,8 @@ User can choose any modes :
 * Waypoint Generator (P2P/Sinusoidal/Cubic/Zigzag)
 * Please modify which modes you want in the "config" Object
 * Of course, for different scenario all gains need to be tuned again
+
+## References
+
+* I use the Ricatti Solver in this repo : https://github.com/TakaHoribe/Riccati_Solver
+* However, this LQR part is for future
