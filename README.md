@@ -34,8 +34,9 @@
 
 This is still under developing progress.
 
-User can choose any modes : Controller (P/PID)
+User can choose any modes :
 
+* Controller (P/PID)
 * Discrete Propagation(Euler/RK4)
 * Vehicle Dynamics (Naive/Advanced Bicycle model)
 * Waypoint Generator (P2P/Sinusoidal/Cubic/Zigzag)
