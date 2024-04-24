@@ -169,6 +169,31 @@ inline void HAL_Delay(const T sec){ //can not be constexpr
 }
 
 template<typename T>
+inline T getRandomNum(T randmin,T randmax)
+{
+   std::random_device rd;
+   std::mt19937 gen(rd());
+   std::uniform_real_distribution<T> dis(randmin, randmax); 
+//    std::uniform_int_distribution<T>(randmin,randmax);
+
+   //different each invocation
+   auto randNum = dis(gen);
+   return randNum;
+}
+
+template<typename T>
+constexpr T map(const T x, const T in_min, const T in_max, 
+                    const T out_min, const T out_max){
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+// Helper function to compute the Euclidean distance between two points.
+template<typename T>
+constexpr T distance(const std::array<T, 2>& p1, const std::array<T, 2>& p2) {
+    return std::hypot(p1[0] - p2[0], p1[1] - p2[1]);
+}
+
+template<typename T>
 constexpr T magicPacejkaFormula(const T alpha, const T Fz, const T mu){
     const T B =  static_cast<T>(5.68); //from TireForce.csv, fitting
     const T C =  static_cast<T>(1.817);
