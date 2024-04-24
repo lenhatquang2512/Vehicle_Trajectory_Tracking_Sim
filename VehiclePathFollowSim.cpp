@@ -26,6 +26,7 @@
 #include <cstdio> // For the std::remove function
 #include <memory>
 #include <limits>
+#include <random>
 
 template<typename T>
 using Waypoint = std::vector<std::array<T, 2>>;
@@ -57,17 +58,21 @@ public:
     const std::string fpath = "vehicle_path.txt";
     const std::string fbody = "vehicle_body.txt";
     const std::string fwaypoint = "waypoints.txt";
-    // const Gain Kp  = {{0.5,0.6}};
-    // const Gain Ki  = {{0.1,0.2}};
-    // const Gain Kd  = {{0.00,0.00}};
-    // const Vsat VClamp = {{-1.0,1.0}};
-    // const Vsat WClamp = {{-2,2}};
+    
+    //-----------suggested tuned gains for Advanced Dynamics-------//
+    // const Gain<T> Kp  = {{0.5,0.6}};
+    // const Gain<T> Ki  = {{0.1,0.2}};
+    // const Gain<T> Kd  = {{0.00,0.00}};
+    // const Vsat<T> VClamp = {{-1.0,1.0}};
+    // const Vsat<T> WClamp = {{-2,2}};
 
+    //-----------suggested tuned gains for naive Dynamics-------//
     const Gain<T> Kp  = {{0.5,4.0}};
     const Gain<T> Ki  = {{0.2,1.0}};
     const Gain<T> Kd  = {{0.05,0.01}};
     const Vsat<T> VClamp = {{-3,3}};
     const Vsat<T> WClamp = {{-INF,INF}};
+
     const T goal_tol = 0.2;
     const bool usePID = true; //or just P-control
     const bool useZigZagWay = false; //or Sample/P2P
@@ -85,7 +90,8 @@ bool solveRiccatiIterationD(const Eigen::MatrixXd &Ad,
 #endif
 
 template<typename T>//from c++11 no need typedef,just warning
-struct STATE{ 
+class STATE{ 
+public:
     T x;
     T y;
     T yaw;
@@ -114,7 +120,8 @@ struct STATE{
 
 };
 template<typename T>
-struct CONTROL{
+class CONTROL{
+public:
     T v;
     T w;
     CONTROL(void) = default;
@@ -163,7 +170,7 @@ inline void HAL_Delay(const T sec){ //can not be constexpr
 
 template<typename T>
 constexpr T magicPacejkaFormula(const T alpha, const T Fz, const T mu){
-    const T B =  static_cast<T>(5.68);
+    const T B =  static_cast<T>(5.68); //from TireForce.csv, fitting
     const T C =  static_cast<T>(1.817);
     T Fy =  mu * Fz * std::sin(C * std::atan((B/mu) * alpha));
     return Fy;
