@@ -77,6 +77,7 @@ public:
     const bool usePID = true; //or just P-control
     const bool useZigZagWay = false; //or Sample/P2P
     const bool useSampleWay = true; //or Zigzag/P2P
+    const float beta = 0.0; // for low pass filter
     const PROPAGATOR_MODE propagator = RK4_NAIVE_DYNAMICS;
 };
 
@@ -169,7 +170,7 @@ inline void HAL_Delay(const T sec){ //can not be constexpr
 }
 
 template<typename T>
-inline T getRandomNum(T randmin,T randmax)
+inline T getRandomNum(const T randmin,const T randmax)
 {
    std::random_device rd;
    std::mt19937 gen(rd());
@@ -192,6 +193,14 @@ template<typename T>
 constexpr T distance(const std::array<T, 2>& p1, const std::array<T, 2>& p2) {
     return std::hypot(p1[0] - p2[0], p1[1] - p2[1]);
 }
+
+template<typename T>
+constexpr T digitalLowPassFilter(const T input, const T output,
+                        const T coef){
+    //this is Low pass exponential, coef aka beta is between 0 and 1
+    return coef * input + (1-coef) * output;
+}
+
 
 template<typename T>
 constexpr T magicPacejkaFormula(const T alpha, const T Fz, const T mu){
@@ -329,7 +338,7 @@ void plotPath(std::ofstream &VehiclePath, const STATE<T> X, const CONTROL<T> U, 
 template<typename T>
 void plotWaypoint(std::ofstream &WaypointFp, const Waypoint<T> waypoints, const std::string fname){
     WaypointFp.open(fname, std::ofstream::out | std::ofstream::trunc); // Truncate mode to overwrite
-    for(const auto waypoint : waypoints){
+    for(const auto &waypoint : waypoints){
         WaypointFp << waypoint[0] << " " << waypoint[1] << std::endl;
     }
     WaypointFp.close(); // Close after writing
@@ -359,13 +368,21 @@ inline void PControl(T &U, const T error, const T Kp ){
 template<typename T>
 inline void PIDControl(T &U, const T error, const T prev_error,
        T &integral_error,const T Kp, const T Ki, const T Kd,
-       const T dt,const T outMin, const T outMax){
+       const T dt,const T outMin, const T outMax,
+       const STATE<T> prev_goal,
+        const STATE<T> goal, const T beta, T &derivative_error){
     //Init integral error or any kind of error outside globally
-     integral_error+= error * dt;
-     clamp<T>(integral_error,outMin,outMax);
-     T derivative_error = (error - prev_error);
-     U = Kp * error + Ki * integral_error + Kd * (derivative_error/dt);
-     clamp<T>(U,outMin,outMax);
+    integral_error+= error * dt;
+    clamp<T>(integral_error,outMin,outMax);
+    // reset the integral if the reference is changed.
+    if (goal.x != prev_goal.x || goal.y != prev_goal.y) {
+        integral_error = static_cast<T>(0.0);
+    }
+    //  T derivative_error = (error - prev_error);
+    T errorChange = error - prev_error;
+    derivative_error = digitalLowPassFilter<T>(derivative_error,errorChange,beta);
+    U = Kp * error + Ki * integral_error + Kd * (derivative_error/dt);
+    clamp<T>(U,outMin,outMax);
      //need to update prev_error
 }
 
@@ -440,6 +457,10 @@ int main(int argc, char const *argv[])
     goal.x = waypoints[0][0];
     goal.y = waypoints[0][1];
     size_t waypointSize = 0;
+    STATE<float> prev_goal{goal}; //lastReference = reference;
+    float derivative_error_V {0};
+    float derivative_error_W {0};
+
 
     // Remove files if they exist
     std::remove(config.fpath.c_str()); // Deletes vehicle_path.txt
@@ -476,12 +497,16 @@ int main(int argc, char const *argv[])
         if(config.usePID){
             if(count==0) PRINT_CMD("USING FULL PID CONTROL");
             PIDControl<float>(U.v,errV,prev_errV,integral_errV,config.Kp[0],
-             config.Ki[0],config.Kd[0],config.dt,config.VClamp[0],config.VClamp[1]);
+             config.Ki[0],config.Kd[0],config.dt,config.VClamp[0],config.VClamp[1],
+                        prev_goal,goal,config.beta,derivative_error_V);
             PIDControl<float>(U.w,errW,prev_errW,integral_errW,config.Kp[1],
-             config.Ki[1],config.Kd[1],config.dt,-INF,INF);
+             config.Ki[1],config.Kd[1],config.dt,-INF,INF,
+             prev_goal,goal,config.beta,derivative_error_W);
             //Update pre_error
             prev_errV = errV;
             prev_errW = errW;
+            //Update prev_goal
+            prev_goal = goal;
         }else{
             if(count==0) PRINT_CMD("JUST USE P-CONTROL");
             PControl<float>(U.v,errV,config.Kp[0]);
