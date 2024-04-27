@@ -77,7 +77,7 @@ public:
     const bool usePID = true; //or just P-control
     const bool useZigZagWay = false; //or Sample/P2P
     const bool useSampleWay = true; //or Zigzag/P2P
-    const float beta = 0.0; // for low pass filter
+    const float beta = 0.9; // for low pass filter
     const PROPAGATOR_MODE propagator = RK4_NAIVE_DYNAMICS;
 };
 
