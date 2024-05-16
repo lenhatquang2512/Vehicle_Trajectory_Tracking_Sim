@@ -628,6 +628,7 @@ int main(int argc, char const *argv[])
             clamp<float>(U.v,config.VClamp[0],config.VClamp[1]); // or U.v = CLAMP(U.v,-1,1);
             clamp<float>(U.w,config.WClamp[0],config.WClamp[1]);
         }else{
+            #ifdef EIGEN_LIB
             //LQR
             if(count==0) PRINT_CMD("USING LQR CONTROL, Note that LQR is only used for NAIVE Dynamics");
             // Call function to get discrete linearized matrices (naive euler)
@@ -647,6 +648,7 @@ int main(int argc, char const *argv[])
                 clamp(U.v, config.VClamp[0], config.VClamp[1]);
                 clamp(U.w, config.WClamp[0],config.WClamp[1]);
             }
+            #endif
         }
 
 
