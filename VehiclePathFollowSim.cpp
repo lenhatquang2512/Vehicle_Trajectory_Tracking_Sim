@@ -2,7 +2,7 @@
  * @file VehiclePathFollowSim.cpp
  * @author Quang Nhat Le (quangle@umich.edu)
  * @brief Complex trajectory tracking with advanced vehicle dynamics, propagated using RK4/Euler and Adaptive PID
- *        User can choose any modes : Controller (P/PID)
+ *        User can choose any modes : Controller (P/PID/LQR)
  *                                    Discrete Propagation(Euler/RK4)
  *                                    Vehicle Dynamics (Naive/Advanced Bicycle model)
  *                                    Waypoint Generator (P2P/Sinusoidal/Cubic/Zigzag)
@@ -27,6 +27,7 @@
 #include <memory>
 #include <limits>
 #include <random>
+#include <time.h>
 
 template<typename T>
 using Waypoint = std::vector<std::array<T, 2>>;
@@ -38,7 +39,9 @@ using Vsat = std::array<T,2>;
 #define CLAMP(x, lower, upper) ((x) < (lower) ? (lower) : ((x) > (upper) ? (upper) : (x)))
 #define PRINT_CMD(x) (std::cout << x << std::endl)
 #define INF (std::numeric_limits<float>::infinity()) // T is float
-// #define EIGEN_LIB 1
+#define PRINT_MAT(X) (std::cout << #X << ":\n" << X << std::endl << std::endl)
+
+#define EIGEN_LIB 1
 
 #ifdef EIGEN_LIB
     #include <Eigen/Dense>
@@ -51,9 +54,17 @@ typedef enum
 	EULER_ADV_DYNAMICS = 3
 }PROPAGATOR_MODE;
 
+typedef enum{
+    P_CONTROL = 0,
+    PID_CONTROL = 1,
+    LQR_CONTROL= 2
+}CONTROLLER_ALG;
+
 template<typename T>
 class Config{
 public:
+    const unsigned int dimState = 3;
+    const unsigned int dimControl = 2;
     const T dt = static_cast<T>(0.01);
     const std::string fpath = "vehicle_path.txt";
     const std::string fbody = "vehicle_body.txt";
@@ -74,20 +85,24 @@ public:
     const Vsat<T> WClamp = {{-INF,INF}};
 
     const T goal_tol = 0.2;
-    const bool usePID = true; //or just P-control
+    // const bool usePID = true; //or just P-control
     const bool useZigZagWay = false; //or Sample/P2P
     const bool useSampleWay = true; //or Zigzag/P2P
-    const float beta = 0.9; // for low pass filter
+    const float beta = 0.1; // for low pass filter
     const PROPAGATOR_MODE propagator = RK4_NAIVE_DYNAMICS;
+    const CONTROLLER_ALG controller = LQR_CONTROL;
+    const bool LQRSaturated = false;
+    // const float lqr_tol = 0.05;
+    const unsigned int lqr_iter_max = 50;
 };
 
 #ifdef EIGEN_LIB
 /* Itereation method for discrete model */
-bool solveRiccatiIterationD(const Eigen::MatrixXd &Ad,
-                            const Eigen::MatrixXd &Bd, const Eigen::MatrixXd &Q,
-                            const Eigen::MatrixXd &R, Eigen::MatrixXd &P,
-                            const double &tolerance = 1.E-5,
-                            const uint iter_max = 100000);
+bool solveRiccatiIterationD(const Eigen::MatrixXf &Ad,
+                            const Eigen::MatrixXf &Bd, const Eigen::MatrixXf &Q,
+                            const Eigen::MatrixXf &R, Eigen::MatrixXf &P,
+                            const float &tolerance = 1.E-5,
+                            const unsigned int iter_max = 100000);
 #endif
 
 template<typename T>//from c++11 no need typedef,just warning
@@ -118,6 +133,13 @@ public:
         yaw += rhs.yaw;
         return *this;
     }
+
+    #ifdef EIGEN_LIB
+        //Overloading * operator for Eigen::Vector3f
+        STATE<T> operator*(const Eigen::Vector3f &mat) const{
+            return {x * mat(0), y * mat(1), yaw * mat(2)};
+        }
+    #endif
 
 };
 template<typename T>
@@ -395,27 +417,30 @@ void computeError(const STATE<T> X, const STATE<T> goal, T &errV, T &errW){
 }
 
 #ifdef EIGEN_LIB
-bool solveRiccatiIterationD(const Eigen::MatrixXd &Ad,
-                            const Eigen::MatrixXd &Bd, const Eigen::MatrixXd &Q,
-                            const Eigen::MatrixXd &R, Eigen::MatrixXd &P,
-                            const double &tolerance,
-                            const uint iter_max) {
+bool solveRiccatiIterationD(const Eigen::MatrixXf &Ad,
+                            const Eigen::MatrixXf &Bd, const Eigen::MatrixXf &Q,
+                            const Eigen::MatrixXf &R, Eigen::MatrixXf &P,
+                            const float &tolerance,
+                            const unsigned int iter_max) {
   P = Q; // initialize
 
-  Eigen::MatrixXd P_next;
+  Eigen::MatrixXf P_next;
 
-  Eigen::MatrixXd AdT = Ad.transpose();
-  Eigen::MatrixXd BdT = Bd.transpose();
-  Eigen::MatrixXd Rinv = R.inverse();
+  Eigen::MatrixXf AdT = Ad.transpose();
+  Eigen::MatrixXf BdT = Bd.transpose();
+  Eigen::MatrixXf Rinv = R.inverse();
 
-  double diff;
-  for (uint i = 0; i < iter_max; ++i) {
+  float diff;
+  for (unsigned int i = 0; i < iter_max; ++i) {
     // -- discrete solver --
     P_next = AdT * P * Ad -
              AdT * P * Bd * (R + BdT * P * Bd).inverse() * BdT * P * Ad + Q;
+    
+    // PRINT_MAT(P_next);
 
-    diff = fabs((P_next - P).maxCoeff());
+    diff = (P_next - P).cwiseAbs().maxCoeff();
     P = P_next;
+    // std::cout << "Iteration " << i << " with diff " << diff << std::endl;
     if (diff < tolerance) {
       std::cout << "iteration mumber = " << i << std::endl;
       return true;
@@ -423,6 +448,70 @@ bool solveRiccatiIterationD(const Eigen::MatrixXd &Ad,
   }
   return false; // over iteration limit
 }
+
+template<typename T>
+void naiveDiscreteZOHModel(const STATE<T> X, const CONTROL<T> U, const Config<T> config,
+        Eigen::MatrixXf &Ad, Eigen::MatrixXf &Bd){
+    Ad =  Eigen::MatrixXf::Zero(config.dimState, config.dimState);
+    Bd =  Eigen::MatrixXf::Zero(config.dimState, config.dimControl);
+    // Since the state does not change the system dynamics, the A matrix is 
+    // the identity matrix -- no state feedback
+    // Ad = I + A * dt
+    Ad.setIdentity();
+    // The B matrix for the discrete system
+    // Position updates depend on velocity and yaw angle
+    //Bd = B*dt
+    Bd << std::cos(X.yaw) * config.dt, 0,
+          std::sin(X.yaw) * config.dt, 0,
+          0, config.dt;
+}
+
+template<typename T>
+Eigen::VectorXf LQRFastControl(const STATE<T> errorState, 
+                    const Eigen::MatrixXf Q, 
+                    const Eigen::MatrixXf R, 
+                    const Eigen::MatrixXf A, 
+                    const Eigen::MatrixXf B, 
+                    const Config<T> config) {
+    // We want the system to stabilize at desired_state_xf.
+    // Eigen::VectorXf x_error = actual_state_x - desired_state_xf;
+
+    Eigen::MatrixXf AT = A.transpose();
+    Eigen::MatrixXf BT = B.transpose();
+
+    // Set the number of iterations
+    const unsigned int N = config.lqr_iter_max;
+
+    // Create an array of N + 1 Eigen::MatrixXf elements for P
+    std::vector<Eigen::MatrixXf> P(N + 1);
+
+    // Initialize to Q for the final cost
+    P[N] = Q;
+
+    // Compute the controller gains K.
+    std::vector<Eigen::MatrixXf> K(N);
+
+    // Dynamic programming to compute P
+    for (unsigned int i = N; i > 0; --i) {
+        // Discrete Algebraic Riccati equation
+        P[i - 1] = Q + AT * P[i] * A - 
+          (AT * P[i] * B) * (R + BT * P[i] * B).inverse() * (BT * P[i] * A);
+    }
+
+    // Compute K values
+    for (unsigned int i = 0; i < N; ++i) {
+        K[i] = (B.transpose() * P[i+1] * B + R).inverse() *B.transpose() * P[i+1] * A;
+    }
+
+    // You can also use the last computed K for the LQR input
+    Eigen::VectorXf stateVec(config.dimState);
+    stateVec << errorState.x, errorState.y, errorState.yaw;
+    Eigen::VectorXf u_star = -K[N - 1] * stateVec;
+
+    return u_star;
+}
+
+
 #endif
 
 int main(int argc, char const *argv[])
@@ -461,6 +550,29 @@ int main(int argc, char const *argv[])
     float derivative_error_V {0};
     float derivative_error_W {0};
 
+    //LQR Setup
+    #ifdef EIGEN_LIB
+    Eigen::MatrixXf Q(3, 3); 
+    Q.setIdentity();
+    Q << 1.0 , 0 ,0,
+        0 , 1.0, 0,
+        0, 0 , 1.0;
+
+    Eigen::MatrixXf R(2, 2);
+    R.setIdentity();  // This is a placeholder. We can set actual R matrix values.
+    R << 0.01, 0,
+         0, 0.01;
+
+    // Eigen::MatrixXf P = Eigen::MatrixXf::Zero(3, 3);  // Solution to Riccati equation
+    
+    // LQR Feedback gain matrix K
+    // Eigen::MatrixXf K;
+    Eigen::MatrixXf Ad;
+    Eigen::MatrixXf Bd;
+    //   STATE errorState(X0);
+
+    #endif
+
 
     // Remove files if they exist
     std::remove(config.fpath.c_str()); // Deletes vehicle_path.txt
@@ -484,6 +596,7 @@ int main(int argc, char const *argv[])
     }
 
     plotWaypoint<float>(WaypointFp,waypoints,config.fwaypoint);
+    clock_t control_start_time = clock();
 
     while(!Stop){
 
@@ -494,7 +607,7 @@ int main(int argc, char const *argv[])
         
         //------------- Controller ---------------------
         computeError<float>(X,goal, errV,errW); //Error input for Controller block (aka setpoint - feedback)
-        if(config.usePID){
+        if(config.controller == PID_CONTROL){
             if(count==0) PRINT_CMD("USING FULL PID CONTROL");
             PIDControl<float>(U.v,errV,prev_errV,integral_errV,config.Kp[0],
              config.Ki[0],config.Kd[0],config.dt,config.VClamp[0],config.VClamp[1],
@@ -507,13 +620,33 @@ int main(int argc, char const *argv[])
             prev_errW = errW;
             //Update prev_goal
             prev_goal = goal;
-        }else{
+        }else if(config.controller == P_CONTROL){
             if(count==0) PRINT_CMD("JUST USE P-CONTROL");
             PControl<float>(U.v,errV,config.Kp[0]);
             PControl<float>(U.w,errW,config.Kp[1]);
             // std::clamp(U.v,-1,1); //c++17
             clamp<float>(U.v,config.VClamp[0],config.VClamp[1]); // or U.v = CLAMP(U.v,-1,1);
             clamp<float>(U.w,config.WClamp[0],config.WClamp[1]);
+        }else{
+            //LQR
+            if(count==0) PRINT_CMD("USING LQR CONTROL, Note that LQR is only used for NAIVE Dynamics");
+            // Call function to get discrete linearized matrices (naive euler)
+            naiveDiscreteZOHModel(X,U,config,Ad,Bd);
+            // PRINT_CMD("Ad = ");
+            // PRINT_MAT(Ad);
+            // PRINT_CMD("Bd = ");
+            // PRINT_MAT(Bd);
+            STATE<float> errorState(X.x - goal.x, X.y - goal.y, errW);  // Construct an error state representation
+
+            Eigen::VectorXf optimal_input = LQRFastControl(errorState, Q, R, Ad, Bd, config);
+            U.v = optimal_input(0);
+            U.w = optimal_input(1);
+
+            // Saturate the inputs if necessary
+            if(config.LQRSaturated){
+                clamp(U.v, config.VClamp[0], config.VClamp[1]);
+                clamp(U.w, config.WClamp[0],config.WClamp[1]);
+            }
         }
 
 
@@ -569,6 +702,10 @@ int main(int argc, char const *argv[])
         count++;
         HAL_Delay<float>(config.dt);
     }
+
+    clock_t control_end_time = clock();
+    std::cout << "Computation time = " << static_cast<double>(control_end_time - control_start_time) / CLOCKS_PER_SEC
+            << "sec." << std::endl;
     
     // VehiclePath.close();
     // VehicleBody.close();
