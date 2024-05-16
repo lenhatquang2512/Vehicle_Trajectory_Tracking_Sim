@@ -148,7 +148,9 @@ class CONTROL{
 public:
     T v;
     T w;
-    CONTROL(void) = default;
+    explicit CONTROL(void) = default;
+    explicit CONTROL(T v0, T w0):
+        v{v0}, w{w0} {}
 };
 //Function Pointer Prototypes
 typedef STATE<float> (*DynamicsFunc)(const STATE<float>, const CONTROL<float>);
@@ -534,7 +536,7 @@ int main(int argc, char const *argv[])
     std::vector<float> timeVec;
     std::vector<STATE<float>> path;
     STATE<float> X {X0};
-    CONTROL<float> U{.v=0,.w=0};
+    CONTROL<float> U(0.0,0.0);
     bool Stop = false;
     float errV{0}; float errW{0};
     float integral_errV{0}; float integral_errW{0};
@@ -636,8 +638,8 @@ int main(int argc, char const *argv[])
             naiveDiscreteZOHModel(X,U,config,Ad,Bd);
             // PRINT_CMD("Ad = ");
             // PRINT_MAT(Ad);
-            PRINT_CMD("Bd = ");
-            PRINT_MAT(Bd);
+            // PRINT_CMD("Bd = ");
+            // PRINT_MAT(Bd);
             STATE<float> errorState(X.x - goal.x, X.y - goal.y, errW);  // Construct an error state representation
 
             Eigen::VectorXf optimal_input = LQRFastControl(errorState, Q, R, Ad, Bd, config);
