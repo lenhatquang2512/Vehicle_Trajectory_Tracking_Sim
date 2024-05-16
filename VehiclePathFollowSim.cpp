@@ -8,6 +8,7 @@
  *                                    Waypoint Generator (P2P/Sinusoidal/Cubic/Zigzag)
  *        Please modify which modes you want in the "config" Object
  *        Of course, for different scenario all gains need to be tuned again
+ *        For LQR , refer to : https://arxiv.org/html/2404.18312v1
  *                                
  * @version 3.0
  * @date 2024-05-16
@@ -635,8 +636,8 @@ int main(int argc, char const *argv[])
             naiveDiscreteZOHModel(X,U,config,Ad,Bd);
             // PRINT_CMD("Ad = ");
             // PRINT_MAT(Ad);
-            // PRINT_CMD("Bd = ");
-            // PRINT_MAT(Bd);
+            PRINT_CMD("Bd = ");
+            PRINT_MAT(Bd);
             STATE<float> errorState(X.x - goal.x, X.y - goal.y, errW);  // Construct an error state representation
 
             Eigen::VectorXf optimal_input = LQRFastControl(errorState, Q, R, Ad, Bd, config);

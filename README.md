@@ -12,12 +12,15 @@ User can choose any modes :
 
 * Controller (P/PID/LQR)
 * Discrete Propagation(Forward Euler/RK4 aka Runge Kutta Method)
-* Vehicle Dynamics (Naive/Advanced Bicycle model)
+* Vehicle Dynamics (Naive/Advanced Bicycle model, Pacejka Tire force model will be updated later)
 * Waypoint Generator (P2P/Sinusoidal/Cubic/Zigzag)
 * Using/Not Using Low Pass Filter in PID
-* Please modify which modes you want in the "config" Object
-* Of course, for different scenario all gains need to be tuned again
-* For LQR, number of maximum iterations and cost weights Q and R need to be tuned properly
+
+Please modify which modes you want in the "config" Object. 
+Of course, for different scenario all gains need to be tuned again. 
+For LQR, number of maximum iterations and cost weights Q and R need to be tuned properly.
+For LQR, the discrete time algebraic Riccati equation (DARE) is solved iteratively.
+
 
 ## Requirement packages
 
@@ -79,6 +82,7 @@ User can choose any modes :
 ## Notes
 
 This is still under developing progress.
+Kalman filter/Particle Filter will be added soon.
 You can check this video that I performed : https://www.youtube.com/watch?v=G9c8e5KYjUQ
 
 
