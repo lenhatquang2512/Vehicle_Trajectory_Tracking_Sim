@@ -1,7 +1,7 @@
 /**
  * @file VehiclePathFollowSim.cpp
  * @author Quang Nhat Le (quangle@umich.edu)
- * @brief Complex trajectory tracking with advanced vehicle dynamics, propagated using RK4/Euler and Adaptive PID
+ * @brief Complex trajectory tracking with advanced vehicle dynamics, propagated using RK4/Euler and Adaptive PID/LQR
  *        User can choose any modes : Controller (P/PID/LQR)
  *                                    Discrete Propagation(Euler/RK4)
  *                                    Vehicle Dynamics (Naive/Advanced Bicycle model)
@@ -29,6 +29,7 @@
 #include <limits>
 #include <random>
 #include <time.h>
+#include <map>
 
 template<typename T>
 using Waypoint = std::vector<std::array<T, 2>>;
@@ -805,12 +806,39 @@ Eigen::VectorXf LQRFastControl(const STATE<T> errorState,
  */
 template<typename T>
 void setConfig(Config<T> *config){
-
+    std::map<std::string,PROPAGATOR_MODE> propaModeNames ={
+        {"RK4NAIVE",RK4_NAIVE_DYNAMICS},
+        {"RK4ADV", RK4_ADV_DYNAMICS},
+        {"EULERNAIVE", EULER_NAIVE_DYNAMICS},
+        {"EULERADV",EULER_ADV_DYNAMICS}
+    };
+    std::map<std::string,CONTROLLER_ALG> controllerAlgNames = {
+        {"P",P_CONTROL},
+        {"PID",PID_CONTROL},
+        {"LQR",LQR_CONTROL}
+    };
+    PRINT_CMD("Wanna config or just default, 1 to config, 0 to default: ");
+    bool cmd; std::cin >> cmd;
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); 
+    if(cmd){
+        std::string propa, controller;
+        PRINT_CMD("Enter the controller type, ");
+        PRINT_CMD("(Please enter p/pid/lqr) : ");
+        getline(std::cin,controller);
+        std::transform(controller.begin(), controller.end(), controller.begin(), ::toupper);
+        PRINT_CMD("Enter the propagation + dynamics models type,");
+        PRINT_CMD("(Please enter rk4naive,rk4adv,eulernaive or euleradv):");
+        getline(std::cin, propa);
+        std::transform(propa.begin(), propa.end(), propa.begin(), ::toupper);
+        config->controller = controllerAlgNames[controller];
+        config->propagator = propaModeNames[propa];
+    }
 }
 
 int main(int argc, char const *argv[])
 {
     Config<float> config;
+    setConfig(&config);
     // STATE X0 {.x = 0, .y = 0, .yaw = deg2rad(80) };
     // STATE goal {.x = 6, .y = 6, .yaw = deg2rad(0)};
     STATE<float> X0(0,0,deg2rad(0));
