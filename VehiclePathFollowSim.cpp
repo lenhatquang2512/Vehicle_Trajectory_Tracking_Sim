@@ -47,6 +47,12 @@ using Vsat = std::array<T,2>;
 #ifdef EIGEN_LIB
     #include <Eigen/Dense>
 #endif
+
+/**
+ * @brief Different propagation modes and dynamics models, can be rk4, euler, naive
+ *      or advanced dynamics
+ * 
+ */
 typedef enum 
 {
 	RK4_NAIVE_DYNAMICS = 0,
@@ -55,12 +61,21 @@ typedef enum
 	EULER_ADV_DYNAMICS = 3
 }PROPAGATOR_MODE;
 
+/**
+ * @brief Different controller types, can be P/PID/LQR
+ * 
+ */
 typedef enum{
     P_CONTROL = 0,
     PID_CONTROL = 1,
     LQR_CONTROL= 2
 }CONTROLLER_ALG;
 
+/**
+ * @brief Configuration class, MODIFY this settings before compiling codes
+ * 
+ * @tparam T 
+ */
 template<typename T>
 class Config{
 public:
@@ -90,8 +105,8 @@ public:
     const bool useZigZagWay = false; //or Sample/P2P
     const bool useSampleWay = true; //or Zigzag/P2P
     const float beta = 0.1; // for low pass filter
-    const PROPAGATOR_MODE propagator = RK4_NAIVE_DYNAMICS;
-    const CONTROLLER_ALG controller = LQR_CONTROL;
+    PROPAGATOR_MODE propagator = RK4_NAIVE_DYNAMICS;
+    CONTROLLER_ALG controller = LQR_CONTROL;
     const bool LQRSaturated = false;
     // const float lqr_tol = 0.05;
     const unsigned int lqr_iter_max = 50;
@@ -106,6 +121,11 @@ bool solveRiccatiIterationD(const Eigen::MatrixXf &Ad,
                             const unsigned int iter_max = 100000);
 #endif
 
+/**
+ * @brief State of the vehicle with some operator overloading
+ * 
+ * @tparam T 
+ */
 template<typename T>//from c++11 no need typedef,just warning
 class STATE{ 
 public:
@@ -143,6 +163,12 @@ public:
     #endif
 
 };
+
+/**
+ * @brief Control input for the model, with explicit constructor
+ * 
+ * @tparam T 
+ */
 template<typename T>
 class CONTROL{
 public:
@@ -152,19 +178,43 @@ public:
     explicit CONTROL(T v0, T w0):
         v{v0}, w{w0} {}
 };
-//Function Pointer Prototypes
+
+/**
+ * @brief Function Pointer Prototypes to use different dynamics model
+ * 
+ */
 typedef STATE<float> (*DynamicsFunc)(const STATE<float>, const CONTROL<float>);
 
+/**
+ * @brief convert degree to radian
+ * 
+ * @tparam T 
+ * @param deg 
+ * @return constexpr T 
+ */
 template<typename T>
 constexpr T deg2rad(const T deg) {
     return static_cast<T>(deg * M_PI / 180.0);
 }
 
+/**
+ * @brief convert radian back to degree
+ * 
+ * @tparam T 
+ * @param rad 
+ * @return constexpr T 
+ */
 template<typename T>
 constexpr T rad2deg(const T rad) {
     return static_cast<T>(rad * 180.0/ M_PI);
 }
 
+/**
+ * @brief Saturate the angle to be in between -pi and pi
+ * 
+ * @tparam T 
+ * @param angle 
+ */
 template<typename T>
 constexpr void nominalAngle(T &angle){ //between -pi and pi
     // angle = std::fmod(angle, 2.0f * M_PI);
@@ -174,6 +224,14 @@ constexpr void nominalAngle(T &angle){ //between -pi and pi
         angle -= 2.0f * M_PI;
 }
 
+/**
+ * @brief Saturate the control input to be between umin and umax
+ * 
+ * @tparam T 
+ * @param u 
+ * @param umin 
+ * @param umax 
+ */
 template<typename T>
 constexpr void clamp(T &u, const T umin, const T umax){
     if (u < umin) {
@@ -183,17 +241,41 @@ constexpr void clamp(T &u, const T umin, const T umax){
     }
 }
 
+/**
+ * @brief Rotate a point in 2D by a given angle, can be used for plotting
+ * 
+ * @tparam T 
+ * @param xrot 
+ * @param yrot 
+ * @param x 
+ * @param y 
+ * @param angle 
+ */
 template<typename T>
 constexpr void rotate2D(T &xrot, T &yrot, const T x, const T y, const T angle){
 	xrot = x * std::cos(angle) - y * std::sin(angle);
 	yrot = x * std::sin(angle) + y * std::cos(angle);
 }
 
+/**
+ * @brief Simple delay (sleep) function with given seconds time
+ * 
+ * @tparam T 
+ * @param sec 
+ */
 template<typename T>
 inline void HAL_Delay(const T sec){ //can not be constexpr
     usleep(sec * 1000000);
 }
 
+/**
+ * @brief Generate a random number between randmin and randmax, use for obstacle generator later
+ * 
+ * @tparam T 
+ * @param randmin 
+ * @param randmax 
+ * @return T 
+ */
 template<typename T>
 inline T getRandomNum(const T randmin,const T randmax)
 {
@@ -207,18 +289,45 @@ inline T getRandomNum(const T randmin,const T randmax)
    return randNum;
 }
 
+/**
+ * @brief Convert a given value from one range to another range, can be used for PWM
+ * 
+ * @tparam T 
+ * @param x 
+ * @param in_min 
+ * @param in_max 
+ * @param out_min 
+ * @param out_max 
+ * @return constexpr T 
+ */
 template<typename T>
 constexpr T map(const T x, const T in_min, const T in_max, 
                     const T out_min, const T out_max){
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-// Helper function to compute the Euclidean distance between two points.
+/**
+ * @brief Helper function to compute the Euclidean distance between two points.
+ * 
+ * @tparam T 
+ * @param p1 
+ * @param p2 
+ * @return constexpr T 
+ */
 template<typename T>
 constexpr T distance(const std::array<T, 2>& p1, const std::array<T, 2>& p2) {
     return std::hypot(p1[0] - p2[0], p1[1] - p2[1]);
 }
 
+/**
+ * @brief Simple yet efficient digital low pass filter, used for PID
+ * 
+ * @tparam T 
+ * @param input 
+ * @param output 
+ * @param coef 
+ * @return constexpr T 
+ */
 template<typename T>
 constexpr T digitalLowPassFilter(const T input, const T output,
                         const T coef){
@@ -226,7 +335,15 @@ constexpr T digitalLowPassFilter(const T input, const T output,
     return coef * input + (1-coef) * output;
 }
 
-
+/**
+ * @brief Magic formula to compute non-linear tire forces, used for non-linear dynamics model later
+ * 
+ * @tparam T 
+ * @param alpha 
+ * @param Fz 
+ * @param mu 
+ * @return constexpr T 
+ */
 template<typename T>
 constexpr T magicPacejkaFormula(const T alpha, const T Fz, const T mu){
     const T B =  static_cast<T>(5.68); //from TireForce.csv, fitting
@@ -235,6 +352,14 @@ constexpr T magicPacejkaFormula(const T alpha, const T Fz, const T mu){
     return Fy;
 }
 
+/**
+ * @brief Dynamics model of the vehicle with only kinematics and no acceleration
+ * 
+ * @tparam T 
+ * @param X 
+ * @param U 
+ * @return STATE<T> 
+ */
 template<typename T>
 STATE<T> naiveDynamics(const STATE<T> X, const CONTROL<T> U){
     STATE<T> dX;
@@ -244,6 +369,14 @@ STATE<T> naiveDynamics(const STATE<T> X, const CONTROL<T> U){
     return dX;
 }
 
+/**
+ * @brief More advanced dynamic model , considering rear axle length and wheelbase length of vehicle
+ * 
+ * @tparam T 
+ * @param X 
+ * @param U 
+ * @return STATE<T> 
+ */
 template<typename T>
 STATE<T> advancedDynamics(const STATE<T> X, const CONTROL<T> U){
     STATE<T> dX;
@@ -257,6 +390,16 @@ STATE<T> advancedDynamics(const STATE<T> X, const CONTROL<T> U){
     return dX;
 }
 
+/**
+ * @brief Legend forward euler method to simulate the state of the vehicle
+ * 
+ * @tparam T 
+ * @param X 
+ * @param U 
+ * @param dt 
+ * @param dynamics 
+ * @return STATE<T> 
+ */
 template<typename T>
 STATE<T> forwardEuler(const STATE<T> X, const CONTROL<T> U, const T dt,DynamicsFunc dynamics){
     STATE<T> nextX ;
@@ -271,6 +414,16 @@ STATE<T> forwardEuler(const STATE<T> X, const CONTROL<T> U, const T dt,DynamicsF
     return nextX;
 }
 
+/**
+ * @brief More sophisticated Runge Kutta Method to simulate the state of the vehicle
+ * 
+ * @tparam T 
+ * @param X 
+ * @param U 
+ * @param dt 
+ * @param dynamics 
+ * @return STATE<T> 
+ */
 template<typename T>
 STATE<T> RK4(const STATE<T> X, const CONTROL<T> U, const T dt, DynamicsFunc dynamics){
     STATE<T> nextX ;
@@ -285,6 +438,12 @@ STATE<T> RK4(const STATE<T> X, const CONTROL<T> U, const T dt, DynamicsFunc dyna
     return nextX;
 }
 
+/**
+ * @brief Generate a fixed cubic path for the vehicle to follow
+ * 
+ * @tparam T 
+ * @param waypoints 
+ */
 template<typename T>
 void sampleCubicWaypointGenerator(Waypoint<T> &waypoints){
     for (T x = static_cast<T>(0.0); x <= static_cast<T>(3.0); x += static_cast<T>(0.5)) {
@@ -300,6 +459,12 @@ void sampleCubicWaypointGenerator(Waypoint<T> &waypoints){
     }
 }
 
+/**
+ * @brief Generate a fixed sinusoidal path for the vehicle to follow
+ * 
+ * @tparam T 
+ * @param waypoints 
+ */
 template<typename T>
 void sampleSineWaypointGenerator(Waypoint<T> &waypoints){
     T amplitude = 2.0;  // Amplitude of the sine wave
@@ -314,6 +479,14 @@ void sampleSineWaypointGenerator(Waypoint<T> &waypoints){
     }
 }
 
+/**
+ * @brief save a path of the vehicle to a txt file for final debug
+ * 
+ * @tparam T 
+ * @param fname 
+ * @param path 
+ * @param timeVec 
+ */
 template<typename T>
 void savePath(const std::string fname, const std::vector<STATE<T>> &path, const std::vector<T> &timeVec){
     std::ofstream MyFile(fname);
@@ -326,6 +499,14 @@ void savePath(const std::string fname, const std::vector<STATE<T>> &path, const 
     MyFile.close();
 }
 
+/**
+ * @brief Save the body of the vehicle (square) into txt file
+ * 
+ * @tparam T 
+ * @param VehicleBody 
+ * @param X 
+ * @param fname 
+ */
 template<typename T>
 void plotVehicle(std::ofstream &VehicleBody, const  STATE<T> X, const std::string fname){
     VehicleBody.open(fname, std::ofstream::out | std::ofstream::trunc);
@@ -353,6 +534,16 @@ void plotVehicle(std::ofstream &VehicleBody, const  STATE<T> X, const std::strin
 
 }
 
+/**
+ * @brief Save a path of the vehicle into txt file
+ * 
+ * @tparam T 
+ * @param VehiclePath 
+ * @param X 
+ * @param U 
+ * @param time 
+ * @param fname 
+ */
 template<typename T>
 void plotPath(std::ofstream &VehiclePath, const STATE<T> X, const CONTROL<T> U, const T time, const std::string fname){
     VehiclePath.open(fname, std::ofstream::out | std::ofstream::app); // Append mode
@@ -360,6 +551,14 @@ void plotPath(std::ofstream &VehiclePath, const STATE<T> X, const CONTROL<T> U, 
     VehiclePath.close(); // Close after writing
 }
 
+/**
+ * @brief Save all waypoints of the path into txt file
+ * 
+ * @tparam T 
+ * @param WaypointFp 
+ * @param waypoints 
+ * @param fname 
+ */
 template<typename T>
 void plotWaypoint(std::ofstream &WaypointFp, const Waypoint<T> waypoints, const std::string fname){
     WaypointFp.open(fname, std::ofstream::out | std::ofstream::trunc); // Truncate mode to overwrite
@@ -369,6 +568,14 @@ void plotWaypoint(std::ofstream &WaypointFp, const Waypoint<T> waypoints, const 
     WaypointFp.close(); // Close after writing
 }
 
+/**
+ * @brief Animate the whole control scenario using Gnuplot
+ * 
+ * @tparam T 
+ * @param gp 
+ * @param config 
+ * @param X 
+ */
 template<typename T>
 void animationPlot(FILE *gp, const Config<T> config, const STATE<T> X){
     // Plot x versus y
@@ -385,11 +592,38 @@ void animationPlot(FILE *gp, const Config<T> config, const STATE<T> X){
     fflush(gp);
 }
 
+/**
+ * @brief Simple yet efficient P Control - my favorite control method
+ * 
+ * @tparam T 
+ * @param U 
+ * @param error 
+ * @param Kp 
+ */
 template<typename T>
 inline void PControl(T &U, const T error, const T Kp ){
     U = Kp * error;
 }
 
+/**
+ * @brief Industrial PID control with calibrarion, integral windup, reset and low pass filter
+ * 
+ * @tparam T 
+ * @param U 
+ * @param error 
+ * @param prev_error 
+ * @param integral_error 
+ * @param Kp 
+ * @param Ki 
+ * @param Kd 
+ * @param dt 
+ * @param outMin 
+ * @param outMax 
+ * @param prev_goal 
+ * @param goal 
+ * @param beta 
+ * @param derivative_error 
+ */
 template<typename T>
 inline void PIDControl(T &U, const T error, const T prev_error,
        T &integral_error,const T Kp, const T Ki, const T Kd,
@@ -411,6 +645,16 @@ inline void PIDControl(T &U, const T error, const T prev_error,
      //need to update prev_error
 }
 
+/**
+ * @brief Compute the error feedback (setpoint aka reference input - actual state)
+ *        can be used for LQR later, u = -K (Xref -X)
+ * 
+ * @tparam T 
+ * @param X 
+ * @param goal 
+ * @param errV 
+ * @param errW 
+ */
 template<typename T>
 void computeError(const STATE<T> X, const STATE<T> goal, T &errV, T &errW){
     errV = static_cast<T>((std::pow(goal.x - X.x,2) + std::pow(goal.y - X.y,2)));
@@ -420,6 +664,19 @@ void computeError(const STATE<T> X, const STATE<T> goal, T &errV, T &errW){
 }
 
 #ifdef EIGEN_LIB
+/**
+ * @brief Discrete algebaric Ricatti equation solver (DARE) with precise tolerance and iterations, not be used
+ * 
+ * @param Ad 
+ * @param Bd 
+ * @param Q 
+ * @param R 
+ * @param P 
+ * @param tolerance 
+ * @param iter_max 
+ * @return true 
+ * @return false 
+ */
 bool solveRiccatiIterationD(const Eigen::MatrixXf &Ad,
                             const Eigen::MatrixXf &Bd, const Eigen::MatrixXf &Q,
                             const Eigen::MatrixXf &R, Eigen::MatrixXf &P,
@@ -452,6 +709,17 @@ bool solveRiccatiIterationD(const Eigen::MatrixXf &Ad,
   return false; // over iteration limit
 }
 
+/**
+ * @brief Linearise and Discretise the naive dynamics model, put it in 
+ *      canonical state space form X(k+1) = Ad * X(k) + Bd * U(k)
+ * 
+ * @tparam T 
+ * @param X 
+ * @param U 
+ * @param config 
+ * @param Ad 
+ * @param Bd 
+ */
 template<typename T>
 void naiveDiscreteZOHModel(const STATE<T> X, const CONTROL<T> U, const Config<T> config,
         Eigen::MatrixXf &Ad, Eigen::MatrixXf &Bd){
@@ -469,6 +737,19 @@ void naiveDiscreteZOHModel(const STATE<T> X, const CONTROL<T> U, const Config<T>
           0, config.dt;
 }
 
+/**
+ * @brief LQR control with fixed number of iterations, choose the optimal control
+ *       input is the final iteration value
+ * 
+ * @tparam T 
+ * @param errorState 
+ * @param Q 
+ * @param R 
+ * @param A 
+ * @param B 
+ * @param config 
+ * @return Eigen::VectorXf 
+ */
 template<typename T>
 Eigen::VectorXf LQRFastControl(const STATE<T> errorState, 
                     const Eigen::MatrixXf Q, 
@@ -509,13 +790,23 @@ Eigen::VectorXf LQRFastControl(const STATE<T> errorState,
     // You can also use the last computed K for the LQR input
     Eigen::VectorXf stateVec(config.dimState);
     stateVec << errorState.x, errorState.y, errorState.yaw;
-    Eigen::VectorXf u_star = -K[N - 1] * stateVec;
+    Eigen::VectorXf u_opt = -K[N - 1] * stateVec;
 
-    return u_star;
+    return u_opt;
 }
 
-
 #endif
+
+/**
+ * @brief Set the Config object
+ * 
+ * @tparam T 
+ * @param config 
+ */
+template<typename T>
+void setConfig(Config<T> *config){
+
+}
 
 int main(int argc, char const *argv[])
 {
