@@ -89,7 +89,7 @@ public:
     //-----------suggested tuned gains for Advanced Dynamics-------//
     // const Gain<T> Kp  = {{0.5,0.6}};
     // const Gain<T> Ki  = {{0.1,0.2}};
-    // const Gain<T> Kd  = {{0.00,0.00}};
+    // const Gain<T> Kd  = {{0.01,0.01}};
     // const Vsat<T> VClamp = {{-1.0,1.0}};
     // const Vsat<T> WClamp = {{-2,2}};
 
