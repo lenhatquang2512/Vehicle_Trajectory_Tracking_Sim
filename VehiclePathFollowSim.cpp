@@ -46,7 +46,7 @@ using Vsat = std::array<T,2>;
 #define EIGEN_LIB 1
 
 #ifdef EIGEN_LIB
-    #include <Eigen/Dense>
+    #include <Eigen/Dense> // Please check whether you have installed eigen or not
 #endif
 
 /**
@@ -101,7 +101,7 @@ public:
     const Vsat<T> VClamp = {{-3,3}};
     const Vsat<T> WClamp = {{-INF,INF}};
 
-    const T goal_tol = 0.2;
+    const T goal_tol = 0.1;
     // const bool usePID = true; //or just P-control
     const bool useZigZagWay = false; //or Sample/P2P
     const bool useSampleWay = true; //or Zigzag/P2P
@@ -110,7 +110,12 @@ public:
     CONTROLLER_ALG controller = LQR_CONTROL;
     const bool LQRSaturated = false;
     // const float lqr_tol = 0.05;
-    const unsigned int lqr_iter_max = 50;
+    const unsigned int lqr_iter_max = 10;
+    const T lqrXWeight = static_cast<T>(1.0);
+    const T lqrYWeight = static_cast<T>(1.0);
+    const T lqrPsiWeight = static_cast<T>(1.0);
+    const T lqrVWeight = static_cast<T>(0.01);
+    const T lqrWWeight = static_cast<T>(0.01);
 };
 
 #ifdef EIGEN_LIB
@@ -874,16 +879,16 @@ int main(int argc, char const *argv[])
 
     //LQR Setup
     #ifdef EIGEN_LIB
-    Eigen::MatrixXf Q(3, 3); 
+    Eigen::MatrixXf Q(config.dimState, config.dimState); 
     Q.setIdentity();
-    Q << 1.0 , 0 ,0,
-        0 , 1.0, 0,
-        0, 0 , 1.0;
+    Q << config.lqrXWeight , 0 ,0,
+        0 , config.lqrYWeight, 0,
+        0, 0 , config.lqrPsiWeight;
 
-    Eigen::MatrixXf R(2, 2);
+    Eigen::MatrixXf R(config.dimControl, config.dimControl);
     R.setIdentity();  // This is a placeholder. We can set actual R matrix values.
-    R << 0.01, 0,
-         0, 0.01;
+    R << config.lqrVWeight, 0,
+         0, config.lqrWWeight;
 
     // Eigen::MatrixXf P = Eigen::MatrixXf::Zero(3, 3);  // Solution to Riccati equation
     
