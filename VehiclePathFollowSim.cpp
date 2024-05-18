@@ -103,8 +103,8 @@ public:
 
     const T goal_tol = 0.1;
     // const bool usePID = true; //or just P-control
-    const bool useZigZagWay = false; //or Sample/P2P
-    const bool useSampleWay = true; //or Zigzag/P2P
+    bool useZigZagWay = false; //or Sample/P2P
+    bool useSampleWay = true; //or Zigzag/P2P
     const float beta = 0.1; // for low pass filter
     PROPAGATOR_MODE propagator = RK4_NAIVE_DYNAMICS;
     CONTROLLER_ALG controller = LQR_CONTROL;
@@ -822,11 +822,15 @@ void setConfig(Config<T> *config){
         {"PID",PID_CONTROL},
         {"LQR",LQR_CONTROL}
     };
+    std::map<std::string,bool> waypointNames = {
+        {"SIN",true},
+        {"ZIGZAG",false}
+    };
     PRINT_CMD("Wanna config or just default, 1 to config, 0 to default: ");
     bool cmd; std::cin >> cmd;
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); 
     if(cmd){
-        std::string propa, controller;
+        std::string propa, controller, waypoint;
         PRINT_CMD("Enter the controller type, ");
         PRINT_CMD("(Please enter p/pid/lqr) : ");
         getline(std::cin,controller);
@@ -835,8 +839,14 @@ void setConfig(Config<T> *config){
         PRINT_CMD("(Please enter rk4naive,rk4adv,eulernaive or euleradv):");
         getline(std::cin, propa);
         std::transform(propa.begin(), propa.end(), propa.begin(), ::toupper);
+        PRINT_CMD("Choose the waypoint path to follow,");
+        PRINT_CMD("Please enter sin or zigzag: ");
+        getline(std::cin, waypoint);
+        std::transform(waypoint.begin(), waypoint.end(), waypoint.begin(), ::toupper);
         config->controller = controllerAlgNames[controller];
         config->propagator = propaModeNames[propa];
+        config->useSampleWay = waypointNames[waypoint];
+        config->useZigZagWay = !(waypointNames[waypoint]);
     }
 }
 
