@@ -29,6 +29,7 @@
 #include <limits>
 #include <random>
 #include <time.h>
+#include <stdlib.h> 
 #include <map>
 
 template<typename T>
@@ -44,6 +45,7 @@ using Vsat = std::array<T,2>;
 #define PRINT_MAT(X) (std::cout << #X << ":\n" << X << std::endl << std::endl)
 
 #define EIGEN_LIB 1
+#define USING_WIN_OR_LINUX 1 // Linux 1, Window 0
 
 #ifdef EIGEN_LIB
     #include <Eigen/Dense> // Please check whether you have installed eigen or not
@@ -82,7 +84,7 @@ class Config{
 public:
     const unsigned int dimState = 3;
     const unsigned int dimControl = 2;
-    const T dt = static_cast<T>(0.01);
+    const T dt = static_cast<T>(0.03); // or 0.01
     const std::string fpath = "vehicle_path.txt";
     const std::string fbody = "vehicle_body.txt";
     const std::string fwaypoint = "waypoints.txt";
@@ -98,22 +100,22 @@ public:
     const Gain<T> Kp  = {{0.5,4.0}};
     const Gain<T> Ki  = {{0.2,1.0}};
     const Gain<T> Kd  = {{0.05,0.01}};
-    const Vsat<T> VClamp = {{-3,3}};
-    const Vsat<T> WClamp = {{-INF,INF}};
+    const Vsat<T> VClamp = {{-2,2}}; // or -(-3,3)
+    const Vsat<T> WClamp = {{-80.0 * M_PI / 180.0,80.0 * M_PI / 180.0}}; // or {{-INF,INF}}
 
     const T goal_tol = 0.1;
     // const bool usePID = true; //or just P-control
     bool useZigZagWay = false; //or Sample/P2P
     bool useSampleWay = true; //or Zigzag/P2P
-    const float beta = 0.1; // for low pass filter
+    const float beta = 0.5; // for low pass filter, or 0.1
     PROPAGATOR_MODE propagator = RK4_NAIVE_DYNAMICS;
     CONTROLLER_ALG controller = LQR_CONTROL;
-    const bool LQRSaturated = false;
+    const bool LQRSaturated = true; //false
     // const float lqr_tol = 0.05;
-    const unsigned int lqr_iter_max = 10;
+    const unsigned int lqr_iter_max = 50; //10
     const T lqrXWeight = static_cast<T>(1.0);
     const T lqrYWeight = static_cast<T>(1.0);
-    const T lqrPsiWeight = static_cast<T>(1.0);
+    const T lqrPsiWeight = static_cast<T>(2.0); //1.0
     const T lqrVWeight = static_cast<T>(0.01);
     const T lqrWWeight = static_cast<T>(0.01);
 };
@@ -850,8 +852,59 @@ void setConfig(Config<T> *config){
     }
 }
 
+/**
+ * @brief Making a simple GUI loading bar to increase real feeling for user
+ * 
+ * @tparam T 
+ * @param barwidth 
+ * @return true 
+ * @return false 
+ */
+template<typename T>
+inline bool printLoadBar(const T barwidth){
+    bool load = false;
+    float progress = 0.0f;
+    while(progress <= 1.01){
+        std::cout << "[";
+        T posBar = static_cast<T>(barwidth * progress);
+        for(T i = static_cast<T>(0); i < barwidth; i++){
+            if(i < posBar) std::cout << "=";
+            else if (i == posBar) std::cout << ">";
+            else std::cout << " ";
+        }
+        std::cout << "] " << static_cast<T>(progress * 100.0) << " %\r";
+	    std::cout.flush();
+        progress += 0.01f;
+        (void) HAL_Delay<float>(0.08f);   
+    }
+    PRINT_CMD(""); 
+    load = true;
+    return load;
+}
+
+/**
+ * @brief Main driver code of this whole program ,long but can be shorten later 
+ * 
+ * @param argc 
+ * @param argv 
+ * @return int 
+ */
 int main(int argc, char const *argv[])
 {
+    //making progress bar
+    if((bool) printLoadBar<int>(80)){
+        PRINT_CMD("...................... >> SIMULATION LOADING OK << ......................");
+        HAL_Delay(2.0f);
+        #ifdef USING_WIN_OR_LINUX
+            system("clear");
+        #else
+            system("cls");
+        #endif
+    }else{
+        PRINT_CMD("TRY AGAIN...");
+    }
+
+    //start config 
     Config<float> config;
     setConfig(&config);
     // STATE X0 {.x = 0, .y = 0, .yaw = deg2rad(80) };
